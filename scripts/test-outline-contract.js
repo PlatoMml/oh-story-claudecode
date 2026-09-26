@@ -95,13 +95,6 @@ try {
   assert.strictEqual(good.report.ok, true)
   assert.deepStrictEqual(good.report.failures, [])
 
-  // 值未定时写 [待补充] 是契约允许的写法，不能因此判失败。
-  const pending = run(writeCase('pending-value', outline({
-    fieldValues: { 契约风险: '[待补充]', 单元ID位置: '[待补充]' },
-  })))
-  assert.strictEqual(pending.status, 0, pending.stdout + pending.stderr)
-  assert.strictEqual(pending.report.ok, true)
-
   // 加粗字段名与半角冒号也要认，否则会误伤正常写法。
   const boldHalfWidth = outline().replace('- 目标情绪：', '- **目标情绪**: ')
   const bold = run(writeCase('bold-halfwidth', boldHalfWidth))
@@ -123,7 +116,7 @@ try {
 
   // ……但其余字段仍按契约允许 [待补充]，不能因此判失败。
   const hollowOther = run(writeCase('hollow-other', outline({
-    fieldValues: { 契约风险: '[待补充]', 章节定位: '[待补充]' },
+    fieldValues: { 契约风险: '[待补充]', 章节定位: '[待补充]', '单元ID/位置': '[待补充]' },
   })))
   assert.strictEqual(hollowOther.status, 0, hollowOther.stdout + hollowOther.stderr)
   assert.strictEqual(hollowOther.report.ok, true)
@@ -163,6 +156,26 @@ try {
   })))
   assert.strictEqual(legacyFourCol.status, 0, legacyFourCol.stdout + legacyFourCol.stderr)
   assert.strictEqual(legacyFourCol.report.ok, true)
+
+  // 阅读体验字段可选：只写核心字段的细纲也过（#383 隔离实验只证明了目标情绪与主角目标的收益）。
+  const OPTIONAL = ['阶段位置', '章节定位', '本章结构公式', '本章标价', '闭环状态', '写手自由区', '契约风险']
+  const coreOnly = outline({ plotTable: [
+    '| # | 情节点（谁做了什么） | 功能标签 | 执行边界（禁＋放） |',
+    '|---|---|---|---|',
+    '| 1 | 江晨接到邀约 | 铺垫 | 禁：不提铁盒。放：无 |',
+    '| 2 | 老人推过铁盒 | 高潮 | 禁：不评价当下。放：允许老人当场说出这东西他留了几十年 |',
+  ].join('\n') }).split('\n').filter((line) => !OPTIONAL.some((name) => line.startsWith(`- ${name}：`))).join('\n')
+  const core = run(writeCase('core-fields-only', coreOnly))
+  assert.strictEqual(core.status, 0, core.stdout + core.stderr)
+
+  // 表头写明「禁＋放」的四列表同样要求至少一个点写了「放」；全是禁令判失败。
+  const allBan = run(writeCase('four-col-all-ban', outline({ plotTable: [
+    '| # | 情节点（谁做了什么） | 功能标签 | 执行边界（禁＋放） |',
+    '|---|---|---|---|',
+    '| 1 | 江晨接到邀约 | 铺垫 | 禁：不提铁盒。放：无 |',
+  ].join('\n') })))
+  assert.strictEqual(allBan.status, 1)
+  assert.deepStrictEqual(failureIds(allBan), ['outline.plotpoint-release'])
 
   // 五列但中间那列不是分辨率，判偏离——防止随便加一列就算数。
   const wrongFifth = run(writeCase('plot-wrong-fifth', outline({
@@ -250,6 +263,13 @@ try {
   const supplyMissing = spawnSync(process.execPath, [verifier, '--json', '--supply', volumeFile, 'D1-03'], { cwd: repoRoot, encoding: 'utf8' })
   assert.strictEqual(supplyMissing.status, 1)
   assert.match(JSON.parse(supplyMissing.stdout).evidence, /供给自查/)
+  // 新书：供给自查写在卷纲旁的 排纲底稿_{单元ID}.md，优先于单元卡。
+  fs.writeFileSync(path.join(volumeDir, '排纲底稿_D1-03.md'), '# D1-03 排纲底稿\n\n## 供给自查\n无缺口\n', 'utf8')
+  const supplyDraft = spawnSync(process.execPath, [verifier, '--json', '--supply', volumeFile, 'D1-03'], { cwd: repoRoot, encoding: 'utf8' })
+  assert.strictEqual(supplyDraft.status, 0, supplyDraft.stdout + supplyDraft.stderr)
+  assert.match(JSON.parse(supplyDraft.stdout).evidence, /排纲底稿含「供给自查」/)
+  fs.writeFileSync(path.join(volumeDir, '排纲底稿_D1-03.md'), '# D1-03 排纲底稿\n\n## 建纲追加\n无追加\n', 'utf8')
+  assert.strictEqual(spawnSync(process.execPath, [verifier, '--json', '--supply', volumeFile, 'D1-03'], { cwd: repoRoot, encoding: 'utf8' }).status, 1)
 
   for (const empty of ['无', '无。', '[待补充]', '；禁：不说破', '']) {
     const body = outline().replace('允许老人当场说出这东西他留了几十年', empty)

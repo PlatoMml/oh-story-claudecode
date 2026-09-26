@@ -479,6 +479,142 @@ class TrackingCommitTests(unittest.TestCase):
         result = self.run_tool("check", expect=2)
         self.assertIn("character snapshot files differ", result.stderr)
 
+    def test_draft_prefills_current_context_so_only_the_delta_is_written(self) -> None:
+        self.init()
+        (self.project / "大纲").mkdir(exist_ok=True)
+        (self.project / "大纲" / "细纲_第001章.md").write_text("### 第 1 章：看片会\n", encoding="utf-8")
+        completed = subprocess.run(
+            [sys.executable, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"],
+            text=True, capture_output=True, check=False, encoding="utf-8")
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        guide = json.loads(completed.stdout)
+        draft_path = Path(guide["draft"])
+        self.assertEqual(draft_path, self.project / ".story/work/第001章/tracking.json")
+        self.assertEqual(guide["mode"], "append")
+        self.assertEqual(guide["limits_chars"]["delta.result"], 160)
+        draft = json.loads(draft_path.read_text(encoding="utf-8"))
+        self.assertEqual(draft["chapter_title"], "看片会")
+        self.assertEqual(draft["expected_state_revision"], self.read_state()["state_revision"])
+        self.assertEqual(draft["context"]["long_term_constraints"],
+                         self.read_state()["context"]["long_term_constraints"])
+        # 新章的故事时间与场景不沿用上一章：留空，逼着按本章结尾填；上一章的值另给参考。
+        previous = self.read_state()["context"]["position"]
+        self.assertEqual((draft["context"]["position"]["story_time"], draft["context"]["position"]["scene"]), ("", ""))
+        self.assertEqual(guide["previous_position"], {"story_time": previous["story_time"], "scene": previous["scene"]})
+        self.assertEqual(draft["context"]["position"]["volume"], previous["volume"])
+        draft["delta"]["result"] = "江晨在看片会上保住了原版。"
+        self.run_tool("commit", draft, expect=2)
+        self.assertEqual(self.read_state()["last_committed_chapter"], 0)
+        draft["context"]["position"].update({"story_time": "看片会当晚", "scene": "剪辑室"})
+        draft_path.write_text(json.dumps(draft, ensure_ascii=False), encoding="utf-8")
+        # 重跑 draft 只刷新修订号，不冲掉已填内容。
+        again = subprocess.run(
+            [sys.executable, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"],
+            text=True, capture_output=True, check=False, encoding="utf-8")
+        self.assertEqual(again.returncode, 0, again.stderr)
+        self.assertIn("原样保留", json.loads(again.stdout)["fill"])
+        draft = json.loads(draft_path.read_text(encoding="utf-8"))
+        self.assertEqual(draft["delta"]["result"], "江晨在看片会上保住了原版。")
+        self.run_tool("commit", draft)
+        self.assertEqual(self.read_state()["last_committed_chapter"], 1)
+        self.assertEqual(self.read_state()["context"]["position"]["scene"], "剪辑室")
+
+    def test_redraft_with_stale_revision_rebuilds_context_and_keeps_filled_parts(self) -> None:
+        self.init()
+        (self.project / "大纲").mkdir(exist_ok=True)
+        (self.project / "大纲" / "细纲_第001章.md").write_text("### 第 1 章：看片会\n", encoding="utf-8")
+        draft_cmd = [sys.executable, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"]
+        first = subprocess.run(draft_cmd, text=True, capture_output=True, check=False, encoding="utf-8")
+        draft_path = Path(json.loads(first.stdout)["draft"])
+        state = self.read_state()
+        # 过期草稿：中间别的事务改过 state 后，旧草稿的修订号与 context 都是旧的。
+        stale = json.loads(draft_path.read_text(encoding="utf-8"))
+        stale["expected_state_revision"] = state["state_revision"] + 7
+        stale["context"]["position"]["volume"] = "旧卷名"
+        stale["delta"]["result"] = "江晨保住了原版。"
+        stale["context"]["position"].update({"story_time": "当晚", "scene": "剪辑室"})
+        draft_path.write_text(json.dumps(stale, ensure_ascii=False), encoding="utf-8")
+        again = subprocess.run(draft_cmd, text=True, capture_output=True, check=False, encoding="utf-8")
+        self.assertEqual(again.returncode, 0, again.stderr)
+        self.assertIn("context 按当前状态重建", json.loads(again.stdout)["fill"])
+        rebuilt = json.loads(draft_path.read_text(encoding="utf-8"))
+        self.assertEqual(rebuilt["expected_state_revision"], state["state_revision"])
+        self.assertEqual(rebuilt["context"]["position"]["volume"], state["context"]["position"]["volume"])
+        self.assertEqual(rebuilt["delta"]["result"], "江晨保住了原版。")
+        self.assertEqual((rebuilt["context"]["position"]["story_time"], rebuilt["context"]["position"]["scene"]),
+                         ("当晚", "剪辑室"))
+        self.run_tool("commit", rebuilt)
+        self.assertEqual(self.read_state()["last_committed_chapter"], 1)
+
+    def test_redraft_merge_keeps_the_drafts_own_additions_and_retirements(self) -> None:
+        self.init()
+        (self.project / "大纲").mkdir(exist_ok=True)
+        (self.project / "大纲" / "细纲_第001章.md").write_text("### 第 1 章：看片会\n", encoding="utf-8")
+        draft_cmd = [sys.executable, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"]
+        first = subprocess.run(draft_cmd, text=True, capture_output=True, check=False, encoding="utf-8")
+        draft_path = Path(json.loads(first.stdout)["draft"])
+        state = self.read_state()
+        old = state["context"]["long_term_constraints"][0]
+        stale = json.loads(draft_path.read_text(encoding="utf-8"))
+        stale["expected_state_revision"] = state["state_revision"] + 7
+        stale["context"]["long_term_constraints"] = ["本章新立的约束。"]  # 删旧条目、加新条目
+        stale["delta"]["retired_context_items"] = [old]
+        stale["delta"]["result"] = "江晨保住了原版。"
+        stale["context"]["position"].update({"story_time": "当晚", "scene": "剪辑室", "volume": "旧卷名"})
+        draft_path.write_text(json.dumps(stale, ensure_ascii=False), encoding="utf-8")
+        again = subprocess.run(draft_cmd, text=True, capture_output=True, check=False, encoding="utf-8")
+        guide = json.loads(again.stdout)
+        self.assertIn("卷信息与当前状态不同", guide["fill"])
+        rebuilt = json.loads(draft_path.read_text(encoding="utf-8"))
+        # 本章的新增留下、退役的不回来。
+        self.assertEqual(rebuilt["context"]["long_term_constraints"], ["本章新立的约束。"])
+        self.run_tool("commit", rebuilt)
+        self.assertEqual(self.read_state()["context"]["long_term_constraints"], ["本章新立的约束。"])
+
+    def test_redraft_revision_and_names_are_not_merged_back_silently(self) -> None:
+        self.init()
+        self.run_tool("commit", transaction(1))
+        # 修订草稿：中间可能插进新章并退役条目，旧草稿多出的条目不能自动带回。
+        draft_cmd = [sys.executable, str(TOOL), "draft", "--project", str(self.project), "--chapter", "1"]
+        first = subprocess.run(draft_cmd, text=True, capture_output=True, check=False, encoding="utf-8")
+        self.assertEqual(json.loads(first.stdout)["mode"], "revision")
+        draft_path = Path(json.loads(first.stdout)["draft"])
+        state = self.read_state()
+        stale = json.loads(draft_path.read_text(encoding="utf-8"))
+        stale["expected_state_revision"] = state["state_revision"] + 7
+        stale["context"]["long_term_constraints"].append("已被后续章节退役的条目。")
+        stale["context"]["active_character_names"].append("路人乙")
+        stale["character_snapshots"] = {"路人乙": {"name": "路人乙"}}  # 后续章节已退役的角色的旧快照
+        draft_path.write_text(json.dumps(stale, ensure_ascii=False), encoding="utf-8")
+        again = subprocess.run(draft_cmd, text=True, capture_output=True, check=False, encoding="utf-8")
+        fill = json.loads(again.stdout)["fill"]
+        rebuilt = json.loads(draft_path.read_text(encoding="utf-8"))
+        self.assertEqual(rebuilt["context"]["long_term_constraints"], state["context"]["long_term_constraints"])
+        self.assertNotIn("路人乙", rebuilt["context"]["active_character_names"])
+        self.assertIn("没有自动带回", fill)
+        self.assertIn("已被后续章节退役的条目。", fill)
+        self.assertIn("在场角色 路人乙", fill)
+        self.assertIn("角色快照 路人乙", fill)
+        self.assertEqual(rebuilt["character_snapshots"], {})
+
+    def test_retired_item_still_in_context_is_rejected(self) -> None:
+        self.init()
+        document = transaction(1)
+        document["delta"]["retired_context_items"] = list(document["context"]["long_term_constraints"])
+        result = self.run_tool("commit", document, expect=2)
+        self.assertIn("lists items that are still in context", result.stderr)
+
+    def test_all_over_length_fields_are_reported_at_once_in_characters(self) -> None:
+        self.init()
+        document = transaction(1, foreshadow=True)
+        document["delta"]["result"] = "江晨" * 100
+        document["delta"]["foreshadow_changes"][0]["summary"] = "老兵" * 70
+        result = self.run_tool("commit", document, expect=2)
+        self.assertIn("2 个字段超长", result.stderr)
+        self.assertIn("delta.result exceeds 480 bytes（现 200 字，上限约 160 字，至少删 40 字）", result.stderr)
+        self.assertIn("summary exceeds 360 bytes（现 140 字，上限约 120 字，至少删 20 字）", result.stderr)
+        self.assertEqual(self.read_state()["last_committed_chapter"], 0)
+
     def test_unknown_fields_are_rejected(self) -> None:
         invalid_init = initial_document()
         invalid_init["baseline"] = {}
@@ -619,18 +755,31 @@ class TrackingCommitTests(unittest.TestCase):
     def test_retiring_a_still_active_character_is_rejected(self) -> None:
         self.init()
         self.run_tool("commit", transaction(1, character=True))
-        conflict = transaction(2, character=True)
-        conflict["delta"]["retired_characters"] = ["江晨"]
-        result = self.run_tool("commit", conflict, expect=2)
-        self.assertIn("江晨", result.stderr)
+        still_listed = transaction(2)
+        still_listed["delta"]["retired_characters"] = ["江晨"]
+        still_listed["context"]["active_character_names"] = ["江晨"]
+        result = self.run_tool("commit", still_listed, expect=2)
+        self.assertIn("retired character 江晨 is still listed in context.active_character_names", result.stderr)
+        self.assertEqual(self.read_state()["state_revision"], 1)
+
+    def test_retiring_and_updating_a_character_in_one_transaction_is_rejected(self) -> None:
+        self.init()
+        self.run_tool("commit", transaction(1, character=True))
+        updated = transaction(2, character=True)
+        updated["delta"]["retired_characters"] = ["江晨"]
+        updated["context"]["active_character_names"] = []
+        result = self.run_tool("commit", updated, expect=2)
+        self.assertIn("character 江晨 cannot be retired and updated in the same transaction", result.stderr)
         self.assertEqual(self.read_state()["state_revision"], 1)
 
     def test_windows_reserved_character_name_is_rejected(self) -> None:
         self.init()
         invalid = transaction(1, character=True)
         invalid["delta"]["character_changes"][0]["name"] = "CON"
+        invalid["context"]["active_character_names"] = ["CON"]
         invalid["character_snapshots"] = {"CON": invalid["character_snapshots"]["江晨"]}
-        self.run_tool("commit", invalid, expect=2)
+        result = self.run_tool("commit", invalid, expect=2)
+        self.assertIn("is reserved on Windows", result.stderr)
         self.assertEqual(self.read_state()["state_revision"], 0)
 
 

@@ -67,7 +67,7 @@ Install this skill https://github.com/zenstory-ai/oh-story-claudecode
 Then run `/story-setup` from your writing-project root (`$story-setup` in Codex) to deploy hooks / agents / references, **and start a fresh session**. Re-run `/story-setup` after every upgrade.
 
 > Per-host deployment differences, known limits and install troubleshooting (Windows `ENOENT`, Antigravity `agy -p`, leftover directories) are in **[Host deployment and install troubleshooting](docs/hosts_EN.md)**.
-> Latest release **v0.7.11** (2026-09-24); see [CHANGELOG.md](CHANGELOG.md) and [Releases](https://github.com/zenstory-ai/oh-story-claudecode/releases).
+> Latest release **v0.8.0** (2026-09-25); see [CHANGELOG.md](CHANGELOG.md) and [Releases](https://github.com/zenstory-ai/oh-story-claudecode/releases).
 
 ## See what it produces
 
@@ -290,17 +290,24 @@ flowchart LR
 
 ## Skills
 
+**These are enough to write a book**: run `story-setup` once, then `story-long-write` for serials or `story-short-write` for short stories, and `story-deslop` to clean up AI tells; if unsure which to call, say `/story` plus one sentence.
+
 | Skill | Trigger | Description |
 |:------|:--------|:------------|
 | `story-setup` | `/story-setup` / `$story-setup` | Environment setup — Claude/Antigravity/OpenCode/Codex/ZCode/OpenClaw/Reasonix plus generic (safe merge) |
 | `story` | `/story` / `$story` / `/story dashboard` | Toolbox router, author-preference management, and local deconstruction/project dashboard |
 | `story-long-write` | `/story-long-write` | Long-form writing — outline building, character design, prose output |
+| `story-short-write` | `/story-short-write` | Short-form writing — emotion design, twist crafting, polish & delivery |
+| `story-deslop` | `/story-deslop` | De-AI-ify — detect and remove AI writing traces |
+
+**Advanced**: benchmark deconstruction, trend scans, importing drafts, multi-perspective review and covers, when you need them.
+
+| Skill | Trigger | Description |
+|:------|:--------|:------------|
 | `story-long-analyze` | `/story-long-analyze` | Long-form deconstruction — Golden First 3 Chapters, payoff design, pacing analysis |
 | `story-long-scan` | `/story-long-scan` | Long-form trend scan — Qidian/Fanqie/Jinjiang market trends |
-| `story-short-write` | `/story-short-write` | Short-form writing — emotion design, twist crafting, polish & delivery |
 | `story-short-analyze` | `/story-short-analyze` | Short-form deconstruction — story core, structure, emotional arc, reversal design, writing techniques, resonance analysis |
 | `story-short-scan` | `/story-short-scan` | Short-form trend scan — Zhihu Yanyan/Fanqie short-form trending data |
-| `story-deslop` | `/story-deslop` | De-AI-ify — detect and remove AI writing traces |
 | `story-import` | `/story-import` | Reverse import — parse existing novels into standard project structure |
 | `story-review` | `/story-review` | Multi-perspective review — 4-agent adversarial review + Fanqie/Qidian/Zhihu scoring rubrics |
 | `story-cover` | `/story-cover` | Cover generation — title/genre analysis + GPT-Image-2 via Codex included usage or API fallback |
@@ -361,7 +368,7 @@ No. oh-story-claudecode is a set of skills that runs inside the coding agent you
 
 ### Chapter lengths are inconsistent or the word count is off. What do I do?
 
-Since v0.7.7 long-form prose uses a single machine-counted length metric: every chapter blueprint must state a valid word target, and a missing target stops the run instead of falling back to 3,000; under-length chapters are not padded with new plot, and over-length chapters get at most one compression pass. `check-prose-after-write.sh` flags length debt after each write. Rerun `/story-setup` and start a new session after upgrading an older project.
+Since v0.7.7 long-form prose uses a single machine-counted length metric: every chapter blueprint must state a valid word target, and a missing target stops the run instead of falling back to 3,000; under-length chapters are not padded with new plot, and over-length chapters get at most one compression pass. Length is measured once by the writing workflow before delivery; the post-write hook no longer flags length debt. Rerun `/story-setup` and start a new session after upgrading an older project.
 
 ### After de-AI editing, detectors such as Zhuque still flag the text as AI. Why?
 

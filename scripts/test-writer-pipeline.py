@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """公开 CLI 回归：取段闭包、存量卷纲、组装与召回降档。"""
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -71,6 +72,13 @@ class PipelineTests(unittest.TestCase):
                 self.assertNotIn('不能串卡', result.stdout)
                 self.assertEqual(self.view('--check', '--strict').returncode, 0)
 
+    def test_default_view_is_the_writing_closure(self):
+        result = self.view('--unit', 'L1-01')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('本卷不揭示', result.stdout)
+        self.assertNotIn('供给材料', result.stdout)
+        self.assertIn('供给材料', self.view('--unit', 'L1-01', '--stage', 'outline').stdout)
+
     def test_legacy_unit_field(self):
         self.volume.write_text('## 第一单元\n- **单元ID**：L1-01\n旧约束', encoding='utf-8')
         result = self.view('--unit', 'L1-01')
@@ -104,8 +112,11 @@ class PipelineTests(unittest.TestCase):
             for old in ['旧方案', '旧口径', '旧行']:
                 self.assertNotIn(old, current)
         history = self.view('--unit', 'L1-01', '--history').stdout
-        for old in ['旧方案', '旧口径', '旧行']:
+        for old in ['旧口径', '旧行']:
             self.assertIn(old, history)
+        # 老卷纲里的批次底稿只在排纲档出现（默认写作档不带底稿）
+        self.assertNotIn('旧方案', history)
+        self.assertIn('旧方案', self.view('--unit', 'L1-01', '--history', '--stage', 'outline').stdout)
 
     def test_fenced_example_not_a_section_and_blank_scope(self):
         text = self.volume_text().replace('## 卷契约\n', '## 卷契约\n\n\n\n')
@@ -124,6 +135,51 @@ class PipelineTests(unittest.TestCase):
         self.assertNotIn('不能串卡', prompt)
         self.assertIn('召回降档：成立', result.stdout)
         self.assertNotIn('以上是 prompt 正文', prompt)
+
+    def test_builder_injects_author_memory_query(self):
+        result = self.build()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('author_preferences（作者记忆', result.stdout)
+        self.assertIn('作者记忆：无相关 active 条目', result.stdout)
+        (self.book / '.story-deployed').write_text('agents_version: 32\n', encoding='utf-8')
+        event = {'schema_version': 1, 'event_id': 'e1', 'operation': {'action': 'remember', 'preference': {
+            'kind': 'prose_style', 'scope': {'level': 'global', 'value': None}, 'assertion': '对话一律用直角引号',
+            'quote': '对话一律用「」', 'source_ref': 'test', 'source': 'explicit_user', 'confidence': 'high',
+            'importance': 'high', 'status': 'active', 'reason': '作者明确要求', 'conflicts_with': [],
+            }}}
+        memory_input = Path(self.tmp.name) / 'memory.json'
+        memory_input.write_text(json.dumps(event, ensure_ascii=False), encoding='utf-8')
+        recorded = self.call('author_memory_commit.py', 'record', '--workspace', self.book, '--input', memory_input)
+        self.assertEqual(recorded.returncode, 0, recorded.stdout + recorded.stderr)
+        result = self.build()
+        self.assertIn('- 对话一律用直角引号（AP001）', result.stdout)
+        self.assertIn('作者记忆：已注入 1 条', result.stdout)
+
+    def test_builder_queries_scoped_author_memory(self):
+        (self.book / '.story-deployed').write_text('agents_version: 32\n', encoding='utf-8')
+        self.put('设定/题材定位.md', '# 题材定位\n- 题材类型：都市 · 悬疑（无言情线）\n')
+        memory_input = Path(self.tmp.name) / 'memory.json'
+        for n, (level, value, assertion) in enumerate([
+                ('genre', '悬疑', '悬疑线索先埋后揭'), ('workflow', '长篇', '长篇每章结尾留钩子'),
+                ('genre', '仙侠', '仙侠用古风称谓'), ('workflow', '交稿', '交稿前先报字数'),
+                ('genre', '言情', '言情线慢热')], 1):
+            event = {'schema_version': 1, 'event_id': f's{n}', 'operation': {'action': 'remember', 'preference': {
+                'kind': 'prose_style', 'scope': {'level': level, 'value': value}, 'assertion': assertion,
+                'quote': assertion, 'source_ref': 'test', 'source': 'explicit_user', 'confidence': 'high',
+                'importance': 'high', 'status': 'active', 'reason': '作者明确要求', 'conflicts_with': [],
+                }}}
+            memory_input.write_text(json.dumps(event, ensure_ascii=False), encoding='utf-8')
+            recorded = self.call('author_memory_commit.py', 'record', '--workspace', self.book, '--input', memory_input)
+            self.assertEqual(recorded.returncode, 0, recorded.stdout + recorded.stderr)
+        result = self.build()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        # 本书题材与长篇流程的限定条目要代查进来，不能只剩全局与本书条目。
+        self.assertIn('悬疑线索先埋后揭', result.stdout)
+        self.assertIn('长篇每章结尾留钩子', result.stdout)
+        self.assertNotIn('仙侠用古风称谓', result.stdout)
+        # 判断不了的限定取值不静默丢弃，留给主会话。
+        self.assertNotIn('言情线慢热', result.stdout)  # 「无言情线」不是言情题材
+        self.assertIn('另有限定范围的作者记忆未代查（题材：仙侠、言情；流程：交稿）', result.stdout)
 
     def test_bare_out_archives_into_book_work_dir(self):
         result = self.call('build_writer_prompt.py', '--project', self.book, '--chapter', 1, '--out')
