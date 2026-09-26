@@ -23,8 +23,8 @@ function readSkill(name) {
 
 const long = readSkill('story-long-write')
 const longLines = long.split(/\r?\n/)
-const longGateLine = longLines.findIndex((line) => line.includes('章节 Reference Gate')) + 1
-assert(longGateLine > 0 && longGateLine <= 20, `long Reference Gate must stay in first screen, got line ${longGateLine}`)
+const longGateLine = longLines.findIndex((line) => line.includes('## 写前必读')) + 1
+assert(longGateLine > 0 && longGateLine <= 20, `long 写前必读 gate must stay in first screen, got line ${longGateLine}`)
 for (const reference of [
   'workflow-setup.md', 'workflow-chapter.md', 'workflow-daily.md', 'workflow-revision.md', 'long-format.md',
   'writing-craft.md', 'long-chapter-quality.md', 'long-chapter-hooks.md', 'long-suspense.md',
@@ -37,8 +37,8 @@ assert.match(long, /记下本轮约束/)
 
 const short = readSkill('story-short-write')
 const shortLines = short.split(/\r?\n/)
-const shortGateLine = shortLines.findIndex((line) => line.includes('阶段 Reference Gate')) + 1
-assert(shortGateLine > 0 && shortGateLine <= 20, `short Reference Gate must stay in first screen, got line ${shortGateLine}`)
+const shortGateLine = shortLines.findIndex((line) => line.includes('## 写前必读')) + 1
+assert(shortGateLine > 0 && shortGateLine <= 20, `short 写前必读 gate must stay in first screen, got line ${shortGateLine}`)
 
 // Check the Phase 2 route and completion gate in the stage reference.
 const shortGate = shortLines.slice(shortGateLine - 1, shortGateLine + 11).join('\n')
