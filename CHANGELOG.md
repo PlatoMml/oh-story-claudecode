@@ -12,6 +12,12 @@ compare 链接；小节名使用 Keep a Changelog 的六个英文类别（`Added
 
 ## [Unreleased]
 
+## [0.8.5] - 2026-10-10
+
+> 技能文件有改动，`agents_version` 与助手模板都没变（仍是 34）：更新技能包、新开会话即可，不用重跑 `/story-setup`。
+
+v0.8.5 让写正文能带上的作者习惯约多一倍，没带上的会在汇报里点名；起点、七猫扫榜加上最近冒头的书库新书。
+
 ### Added
 
 - **扫起点、七猫时能看最近冒头的新书**：两边各多了一份「书库新书」——最近三天还在更新、30 万字以内的连载书，七猫按点击、起点按人气，翻页取前几页（默认 3 页，最多 10 页），名次就是点击或人气排名，汇总时算进「新书榜」那一列。七猫这份不用开浏览器，题材会补成和排行榜一样的大类；起点这份要开浏览器，页面上加密的字数会解出来，签约、收费从作品页补；新书的总推荐数值小，单独列出，不和月票榜、畅销榜混算热度。说「扫七猫新书」也会进长篇扫榜。
@@ -1233,7 +1239,8 @@ npx skills add zenstory-ai/oh-story-claudecode -y -g
 - 初始版本：长篇/短篇写作、拆文、扫榜、去 AI 味、浏览器操控
 - 用 52000+ 本真实数据增强知识库
 
-[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.8.4...HEAD
+[Unreleased]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.8.5...HEAD
+[0.8.5]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.8.4...v0.8.5
 [0.8.4]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/zenstory-ai/oh-story-claudecode/compare/v0.8.1...v0.8.2
