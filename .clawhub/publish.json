@@ -55,7 +55,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "f47a231b95ebfd9b0ede97ecbe3eb6fb2e2dd7fea7cb0075d9c330a8465b4fba",
+      "packageDigest": "bf51dcb4632334262edb08e6b54bfab31bc5d2a60220febaa1c485270b1203bc",
       "path": "skills/story",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -65,14 +65,14 @@
       },
       "runtimeDependsOn": [
         "bin:node",
-        "skill:worldwonderer/story-cover@1.1.12",
+        "skill:worldwonderer/story-cover@1.1.13",
         "skill:worldwonderer/story-deslop@1.1.38",
         "skill:worldwonderer/story-import@1.0.35",
         "skill:worldwonderer/story-long-analyze@1.1.33",
         "skill:worldwonderer/story-long-scan@1.1.23",
         "skill:worldwonderer/story-long-write@1.1.45",
-        "skill:worldwonderer/story-review@1.1.40",
-        "skill:worldwonderer/story-setup@1.1.43",
+        "skill:worldwonderer/story-review@1.1.41",
+        "skill:worldwonderer/story-setup@1.1.44",
         "skill:worldwonderer/story-short-analyze@1.1.27",
         "skill:worldwonderer/story-short-scan@1.1.20",
         "skill:worldwonderer/story-short-write@1.1.33"
@@ -85,7 +85,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.0.28"
+      "version": "1.0.29"
     },
     {
       "catalogMigration": true,
@@ -101,7 +101,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "ca899f32676a867b42c7c6882bf9af20cee1fa607dc88ab3d536e08915b9ae9a",
+      "packageDigest": "7f73df7c89848c1b7137cf4a490984becd85aa9ad859434aa6110463352d002a",
       "path": "skills/story-cover",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -120,7 +120,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.1.12"
+      "version": "1.1.13"
     },
     {
       "catalogMigration": true,
@@ -315,7 +315,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "2ddb60cf7231b414fbd75cf6dd5899ad9b24a69bea0172dcb8350072dec0b248",
+      "packageDigest": "2874a0d92faa80da90d8b69f2357bab43cae9947e5b41d8652ad750046fe5215",
       "path": "skills/story-review",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -335,7 +335,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.1.40"
+      "version": "1.1.41"
     },
     {
       "catalogMigration": true,
@@ -351,7 +351,7 @@
         "**/*"
       ],
       "maintainer": "worldwonderer",
-      "packageDigest": "cc95f89efc9c2b9ec3903d61edf4a1f808998e9ff4f6cb872ea8ef3a95f207ce",
+      "packageDigest": "c170133f6c2cc09cc49260ea4dac519af5d2149eb6be6c8284140d8accd8b023",
       "path": "skills/story-setup",
       "publisher": "worldwonderer",
       "rebuildOn": [],
@@ -371,7 +371,7 @@
         "chinese",
         "storytelling"
       ],
-      "version": "1.1.43"
+      "version": "1.1.44"
     },
     {
       "catalogMigration": true,
@@ -476,6 +476,37 @@
         "storytelling"
       ],
       "version": "1.1.33"
+    },
+    {
+      "categories": [
+        "creative",
+        "agents",
+        "knowledge"
+      ],
+      "displayName": "story-publish：发布准备",
+      "disposition": "excluded",
+      "excludeReason": "New skill publication identity and maintainer authorization remain under upstream review; bundled installs include it, standalone ClawHub story must handle its absence.",
+      "include": [
+        "**/*"
+      ],
+      "maintainer": "worldwonderer",
+      "path": "skills/story-publish",
+      "publisher": "worldwonderer",
+      "rebuildOn": [],
+      "rights": {
+        "evidence": "Pending upstream review of contributor authorization and publication identity.",
+        "status": "unconfirmed"
+      },
+      "runtimeDependsOn": [],
+      "slug": "story-publish",
+      "supportedRuntimes": [],
+      "topics": [
+        "writing",
+        "fiction",
+        "chinese",
+        "storytelling"
+      ],
+      "version": "1.0.0"
     }
   ]
 }
